@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Advanced PNG to SVG Vectorizer</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 40px 20px; text-align: center; background-color: #f8f8f8; }
+    h2 { margin-bottom: 10px; }
+    #layoutRow { display: flex; justify-content: center; align-items: flex-start; gap: 40px; flex-wrap: wrap; margin-top: 30px; }
+    .controls { text-align: left; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); min-width: 300px; max-width: 300px; }
+    .controls label { display: block; margin: 10px 0 5px; }
+    .controls input[type="number"], .controls select { width: 100%; padding: 5px; box-sizing: border-box; }
+    .previewBox { width: 400px; height: 400px; border: 1px solid #ccc; background: white; overflow: auto; display: flex; align-items: center; justify-content: center; }
+    #preview { max-width: 100%; max-height: 100%; object-fit: contain; }
+    #svgPreview { width: 100%; height: 100%; }
+    #svgPreview svg { transform-origin: top left; display: inline-block; }
+    button { margin-top: 10px; padding: 10px 20px; font-size: 16px; cursor: pointer; width: 100%; }
+    #result { display: none; }
+    @media (max-width: 1000px) {
+      #layoutRow { flex-direction: column; align-items: center; }
+      .controls { max-width: none; }
+      .previewBox { width: 100%; height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <h2>Upload a black & white PNG</h2>
+  <input type="file" id="fileInput"><br><br>
+  <div id="layoutRow">
+    <div class="previewBox"><img id="preview" alt="PNG Preview"></div>
+    <div class="controls">
+      <label>Threshold:</label>
+      <input type="number" id="threshold" min="0" max="255" value="180">
+      <label>Speck Removal (turdSize):</label>
+      <input type="number" id="turdSize" min="0" max="50" value="2">
+      <label>Smoothness (alphamax):</label>
+      <input type="number" id="alphamax" min="0" max="1" step="0.05" value="1.0">
+      <label>Curve Tolerance (optTolerance):</label>
+      <input type="number" id="optTolerance" min="0.01" max="1.0" step="0.01" value="0.2">
+      <label>Presets:</label>
+      <select id="presetSelect"><option value="">None</option><option value="minimal">Minimal</option><option value="smooth">Smooth</option><option value="detailed">Detailed</option></select>
+      <label><input type="checkbox" id="invert"> Invert Colors</label>
+      <label><input type="checkbox" id="optCurve" checked> Optimize Curves</label>
+      <label>Turn Policy:</label>
+      <select id="turnPolicy"><option value="minority">Minority</option><option value="majority">Majority</option><option value="left">Left</option><option value="right">Right</option><option value="black">Black</option><option value="white">White</option></select>
+      <label>SVG Zoom:</label>
+      <input type="number" id="zoom" min="0.1" step="0.1" value="1.0">
+      <button onclick="upload()">Convert</button>
+      <button id="downloadBtn" style="display:none" onclick="downloadSVG()">Download SVG</button>
+    </div>
+    <div class="previewBox" id="svgPreview"></div>
+  </div>
+  <div id="result"></div>
+  <script>
+    const preview = document.getElementById('preview');
+    const svgPreview = document.getElementById('svgPreview');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const zoomInput = document.getElementById('zoom');
+    let currentSVG = '', previousSVG = '';
+
+    document.getElementById('presetSelect').addEventListener('change', (e) => {
+      const preset = e.target.value;
+      if (preset === 'minimal') { threshold.value = 220; turdSize.value = 10; alphamax.value = 0.0; optTolerance.value = 0.5; }
+      else if (preset === 'smooth') { threshold.value = 150; turdSize.value = 2; alphamax.value = 1.0; optTolerance.value = 0.2; }
+      else if (preset === 'detailed') { threshold.value = 180; turdSize.value = 1; alphamax.value = 0.7; optTolerance.value = 0.1; }
+    });
+
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => { preview.src = reader.result; };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    zoomInput.addEventListener('input', () => {
+      const svg = svgPreview.querySelector('svg');
+      if (svg) svg.style.transform = `scale(${zoomInput.value})`;
+    });
+
+    async function upload() {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) return alert("Select a PNG first!");
+
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("threshold", document.getElementById("threshold").value);
+      formData.append("turdSize", document.getElementById("turdSize").value);
+      formData.append("alphamax", document.getElementById("alphamax").value);
+      formData.append("invert", document.getElementById("invert").checked);
+      formData.append("optCurve", document.getElementById("optCurve").checked);
+      formData.append("optTolerance", document.getElementById("optTolerance").value);
+      formData.append("turnPolicy", document.getElementById("turnPolicy").value);
+
+      const res = await fetch("/api/vectorize", { method: "POST", body: formData });
+      const svg = await res.text();
+      previousSVG = currentSVG;
+      currentSVG = svg;
+      document.getElementById("result").innerHTML = svg;
+      svgPreview.innerHTML = svg;
+      downloadBtn.style.display = 'inline-block';
+      zoomInput.dispatchEvent(new Event("input"));
+    }
+
+    function downloadSVG() {
+      const blob = new Blob([currentSVG], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'converted-image.svg';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
