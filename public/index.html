@@ -59,7 +59,7 @@
       object-fit: contain;
     }
     #svgContainer {
-      transform-origin: 0 0;
+      transform-origin: center center;
       display: inline-block;
       will-change: transform;
     }
@@ -129,6 +129,7 @@
 
       <button onclick="upload()">Convert</button>
       <button id="downloadBtn" style="display:none" onclick="downloadSVG()">Download SVG</button>
+      <button onclick="resetView()">Reset View</button>
     </div>
 
     <!-- SVG Preview -->
@@ -187,10 +188,6 @@
       updateTransform();
     });
 
-    function updateTransform() {
-      svgContainer.style.transform = `scale(${scale}) translate(${offsetX / scale}px, ${offsetY / scale}px)`;
-    }
-
     svgPreview.addEventListener('mousedown', (e) => {
       isPanning = true;
       startX = e.clientX;
@@ -219,6 +216,45 @@
       updateTransform();
     });
 
+    svgPreview.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = 0.1;
+      const delta = Math.sign(e.deltaY);
+      const newScale = scale * (1 - delta * zoomFactor);
+      if (newScale < 0.1 || newScale > 10) return;
+
+      const rect = svgContainer.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      offsetX -= mouseX * (newScale - scale);
+      offsetY -= mouseY * (newScale - scale);
+
+      scale = newScale;
+      zoomInput.value = scale.toFixed(2);
+      updateTransform();
+    }, { passive: false });
+
+    function updateTransform() {
+      svgContainer.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+    }
+
+    function resetView() {
+      const svgElement = svgContainer.querySelector('svg');
+      const containerRect = svgPreview.getBoundingClientRect();
+      scale = 1;
+      zoomInput.value = scale;
+      if (svgElement) {
+        const bbox = svgElement.getBBox();
+        offsetX = (containerRect.width - bbox.width) / 2;
+        offsetY = (containerRect.height - bbox.height) / 2;
+      } else {
+        offsetX = 0;
+        offsetY = 0;
+      }
+      updateTransform();
+    }
+
     async function upload() {
       const file = document.getElementById('fileInput').files[0];
       if (!file) return alert("Select a PNG first!");
@@ -243,9 +279,19 @@
       svgContainer.innerHTML = svg;
       currentSVG = svg;
       downloadBtn.style.display = 'inline-block';
-      offsetX = 0;
-      offsetY = 0;
-      zoomInput.dispatchEvent(new Event("input"));
+
+      const svgElement = svgContainer.querySelector('svg');
+      const containerRect = svgPreview.getBoundingClientRect();
+      scale = parseFloat(zoomInput.value);
+      if (svgElement) {
+        const bbox = svgElement.getBBox();
+        offsetX = (containerRect.width - bbox.width * scale) / 2;
+        offsetY = (containerRect.height - bbox.height * scale) / 2;
+      } else {
+        offsetX = 0;
+        offsetY = 0;
+      }
+      updateTransform();
     }
 
     function downloadSVG() {
