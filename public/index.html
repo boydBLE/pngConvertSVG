@@ -46,16 +46,22 @@
       height: 400px;
       border: 1px solid #ccc;
       background: white;
-      overflow: auto;
+      overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
+      position: relative;
+      cursor: grab;
     }
-    #preview,
-    #svgPreview svg {
+    #preview {
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
+    }
+    #svgContainer {
+      transform-origin: 0 0;
+      display: inline-block;
+      will-change: transform;
     }
     button {
       margin-top: 10px;
@@ -126,15 +132,24 @@
     </div>
 
     <!-- SVG Preview -->
-    <div class="previewBox" id="svgPreview"></div>
+    <div class="previewBox" id="svgPreview">
+      <div id="svgContainer"></div>
+    </div>
   </div>
 
   <script>
     const preview = document.getElementById('preview');
     const svgPreview = document.getElementById('svgPreview');
+    const svgContainer = document.getElementById('svgContainer');
     const zoomInput = document.getElementById('zoom');
     const downloadBtn = document.getElementById('downloadBtn');
     let currentSVG = '';
+    let scale = 1;
+    let isPanning = false;
+    let startX = 0;
+    let startY = 0;
+    let offsetX = 0;
+    let offsetY = 0;
 
     document.getElementById('presetSelect').addEventListener('change', (e) => {
       const preset = e.target.value;
@@ -168,10 +183,40 @@
     });
 
     zoomInput.addEventListener('input', () => {
-      const svg = svgPreview.querySelector('svg');
-      if (svg) {
-        svg.style.transform = `scale(${parseFloat(zoomInput.value)})`;
-      }
+      scale = parseFloat(zoomInput.value);
+      updateTransform();
+    });
+
+    function updateTransform() {
+      svgContainer.style.transform = `scale(${scale}) translate(${offsetX / scale}px, ${offsetY / scale}px)`;
+    }
+
+    svgPreview.addEventListener('mousedown', (e) => {
+      isPanning = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      svgPreview.style.cursor = 'grabbing';
+    });
+
+    svgPreview.addEventListener('mouseup', () => {
+      isPanning = false;
+      svgPreview.style.cursor = 'grab';
+    });
+
+    svgPreview.addEventListener('mouseleave', () => {
+      isPanning = false;
+      svgPreview.style.cursor = 'grab';
+    });
+
+    svgPreview.addEventListener('mousemove', (e) => {
+      if (!isPanning) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      startX = e.clientX;
+      startY = e.clientY;
+      offsetX += dx;
+      offsetY += dy;
+      updateTransform();
     });
 
     async function upload() {
@@ -195,9 +240,11 @@
       });
 
       const svg = await res.text();
-      svgPreview.innerHTML = svg;
+      svgContainer.innerHTML = svg;
       currentSVG = svg;
       downloadBtn.style.display = 'inline-block';
+      offsetX = 0;
+      offsetY = 0;
       zoomInput.dispatchEvent(new Event("input"));
     }
 
