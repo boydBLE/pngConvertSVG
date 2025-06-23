@@ -6,28 +6,31 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 40px;
+      margin: 0;
+      padding: 20px;
       background: #f4f4f4;
+      text-align: center;
     }
 
     h2 {
-      text-align: center;
+      margin-bottom: 10px;
     }
 
     #layoutRow {
       display: flex;
       justify-content: center;
-      gap: 30px;
+      gap: 20px;
       flex-wrap: wrap;
-      margin-top: 20px;
+      margin-top: 30px;
     }
 
     .controls {
-      background: white;
+      background: #fff;
       padding: 20px;
       border-radius: 10px;
-      width: 300px;
-      box-shadow: 0 0 10px #ccc;
+      min-width: 300px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      text-align: left;
     }
 
     .controls label {
@@ -35,14 +38,15 @@
       margin: 10px 0 5px;
     }
 
-    .controls input, .controls select {
+    .controls input[type="number"],
+    .controls select {
       width: 100%;
       padding: 5px;
     }
 
     .previewBox {
-      width: 400px;
-      height: 400px;
+      width: 300px;
+      height: 300px;
       background: white;
       border: 1px solid #ccc;
       display: flex;
@@ -56,36 +60,29 @@
       max-height: 100%;
     }
 
-    #svgPreview {
-      width: 100%;
-      height: 100%;
-    }
-
     #svgPreview svg {
-      display: inline-block;
-      transform-origin: top left;
+      max-width: 100%;
+      max-height: 100%;
     }
 
     button {
       margin-top: 10px;
+      width: 100%;
       padding: 10px;
       font-size: 16px;
       cursor: pointer;
-      width: 100%;
     }
   </style>
 </head>
 <body>
-  <h2>Upload a black & white PNG or generate SVG</h2>
+  <h2>Upload a black & white PNG</h2>
   <input type="file" id="fileInput"><br><br>
 
   <div id="layoutRow">
-    <!-- PNG Preview -->
     <div class="previewBox">
-      <img id="preview" alt="PNG Preview">
+      <img id="preview" alt="PNG Preview" />
     </div>
 
-    <!-- Controls -->
     <div class="controls">
       <label>Threshold:</label>
       <input type="number" id="threshold" min="0" max="255" value="180">
@@ -96,7 +93,7 @@
       <label>Smoothness (alphamax):</label>
       <input type="number" id="alphamax" min="0" max="1" step="0.05" value="1.0">
 
-      <label>Curve Tolerance (optTolerance):</label>
+      <label>Curve Tolerance:</label>
       <input type="number" id="optTolerance" min="0.01" max="1.0" step="0.01" value="0.2">
 
       <label>Turn Policy:</label>
@@ -109,55 +106,48 @@
         <option value="white">White</option>
       </select>
 
-      <label><input type="checkbox" id="invert"> Invert</label>
+      <label><input type="checkbox" id="invert"> Invert Colors</label>
       <label><input type="checkbox" id="optCurve" checked> Optimize Curves</label>
-
-      <!-- NEW OUTLINE OPTIONS -->
-      <label><input type="checkbox" id="outlineOnly"> Outline Only</label>
-      <label>Stroke Color:</label>
-      <input type="color" id="strokeColor" value="#000000">
-
-      <label>Stroke Width:</label>
-      <input type="number" id="strokeWidth" value="1" min="0" step="0.5">
+      <label><input type="checkbox" id="outerOnly"> Outer Outline Only</label>
 
       <button onclick="upload()">Convert</button>
-      <button onclick="downloadSVG()">Download SVG</button>
+      <button id="downloadBtn" style="display:none" onclick="downloadSVG()">Download SVG</button>
     </div>
 
-    <!-- SVG Preview -->
     <div class="previewBox" id="svgPreview"></div>
   </div>
 
   <script>
     const preview = document.getElementById('preview');
     const svgPreview = document.getElementById('svgPreview');
+    const downloadBtn = document.getElementById('downloadBtn');
     let currentSVG = '';
 
-    document.getElementById('fileInput').addEventListener('change', e => {
+    document.getElementById('fileInput').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = () => preview.src = reader.result;
+        reader.onload = () => {
+          preview.src = reader.result;
+        };
         reader.readAsDataURL(file);
       }
     });
 
     async function upload() {
       const file = document.getElementById('fileInput').files[0];
-      if (!file) return alert('Upload a PNG first.');
+      if (!file) return alert("Please upload a PNG file first.");
 
       const formData = new FormData();
       formData.append("image", file);
       formData.append("threshold", document.getElementById("threshold").value);
       formData.append("turdSize", document.getElementById("turdSize").value);
       formData.append("alphamax", document.getElementById("alphamax").value);
-      formData.append("invert", document.getElementById("invert").checked);
-      formData.append("optCurve", document.getElementById("optCurve").checked);
       formData.append("optTolerance", document.getElementById("optTolerance").value);
       formData.append("turnPolicy", document.getElementById("turnPolicy").value);
-      formData.append("outlineOnly", document.getElementById("outlineOnly").checked);
-      formData.append("strokeColor", document.getElementById("strokeColor").value);
-      formData.append("strokeWidth", document.getElementById("strokeWidth").value);
+      formData.append("invert", document.getElementById("invert").checked);
+      formData.append("optCurve", document.getElementById("optCurve").checked);
+      formData.append("outerOnly", document.getElementById("outerOnly").checked);
 
       const res = await fetch("/api/vectorize", {
         method: "POST",
@@ -167,15 +157,19 @@
       const svg = await res.text();
       svgPreview.innerHTML = svg;
       currentSVG = svg;
+      downloadBtn.style.display = "inline-block";
     }
 
     function downloadSVG() {
-      if (!currentSVG) return alert("Nothing to download!");
       const blob = new Blob([currentSVG], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = "converted.svg";
+      a.href = url;
+      a.download = "vectorized-image.svg";
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
   </script>
 </body>
