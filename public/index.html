@@ -47,9 +47,6 @@
       border: 1px solid #ccc;
       background: white;
       overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       position: relative;
       cursor: grab;
     }
@@ -58,9 +55,14 @@
       max-height: 100%;
       object-fit: contain;
     }
+    #panContainer {
+      position: absolute;
+      left: 0;
+      top: 0;
+      will-change: transform;
+    }
     #svgContainer {
       transform-origin: center center;
-      display: inline-block;
       will-change: transform;
     }
     button {
@@ -134,23 +136,27 @@
 
     <!-- SVG Preview -->
     <div class="previewBox" id="svgPreview">
-      <div id="svgContainer"></div>
+      <div id="panContainer">
+        <div id="svgContainer"></div>
+      </div>
     </div>
   </div>
 
   <script>
     const preview = document.getElementById('preview');
     const svgPreview = document.getElementById('svgPreview');
+    const panContainer = document.getElementById('panContainer');
     const svgContainer = document.getElementById('svgContainer');
     const zoomInput = document.getElementById('zoom');
     const downloadBtn = document.getElementById('downloadBtn');
+
     let currentSVG = '';
     let scale = 1;
+    let offsetX = 0;
+    let offsetY = 0;
     let isPanning = false;
     let startX = 0;
     let startY = 0;
-    let offsetX = 0;
-    let offsetY = 0;
 
     document.getElementById('presetSelect').addEventListener('change', (e) => {
       const preset = e.target.value;
@@ -223,35 +229,32 @@
       const newScale = scale * (1 - delta * zoomFactor);
       if (newScale < 0.1 || newScale > 10) return;
 
-      const rect = svgContainer.getBoundingClientRect();
+      const rect = svgPreview.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      offsetX -= mouseX * (newScale - scale);
-      offsetY -= mouseY * (newScale - scale);
+      const beforeZoomX = (mouseX - offsetX) / scale;
+      const beforeZoomY = (mouseY - offsetY) / scale;
 
       scale = newScale;
       zoomInput.value = scale.toFixed(2);
+
+      offsetX = mouseX - beforeZoomX * scale;
+      offsetY = mouseY - beforeZoomY * scale;
+
       updateTransform();
     }, { passive: false });
 
     function updateTransform() {
-      svgContainer.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+      panContainer.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+      svgContainer.style.transform = `scale(${scale})`;
     }
 
     function resetView() {
-      const svgElement = svgContainer.querySelector('svg');
-      const containerRect = svgPreview.getBoundingClientRect();
       scale = 1;
-      zoomInput.value = scale;
-      if (svgElement) {
-        const bbox = svgElement.getBBox();
-        offsetX = (containerRect.width - bbox.width) / 2;
-        offsetY = (containerRect.height - bbox.height) / 2;
-      } else {
-        offsetX = 0;
-        offsetY = 0;
-      }
+      offsetX = 0;
+      offsetY = 0;
+      zoomInput.value = 1;
       updateTransform();
     }
 
@@ -280,13 +283,13 @@
       currentSVG = svg;
       downloadBtn.style.display = 'inline-block';
 
+      // Center SVG
       const svgElement = svgContainer.querySelector('svg');
-      const containerRect = svgPreview.getBoundingClientRect();
-      scale = parseFloat(zoomInput.value);
+      const previewBox = svgPreview.getBoundingClientRect();
       if (svgElement) {
         const bbox = svgElement.getBBox();
-        offsetX = (containerRect.width - bbox.width * scale) / 2;
-        offsetY = (containerRect.height - bbox.height * scale) / 2;
+        offsetX = (previewBox.width - bbox.width) / 2;
+        offsetY = (previewBox.height - bbox.height) / 2;
       } else {
         offsetX = 0;
         offsetY = 0;
