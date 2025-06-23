@@ -1,100 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>PNG to SVG Converter</title>
+  <meta charset="UTF-8" />
+  <title>Advanced PNG to SVG Vectorizer</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 20px;
-      background: #f9f9f9;
+      margin: 0;
+      padding: 40px 20px;
+      background-color: #f8f8f8;
+      text-align: center;
     }
-
-    .container {
-      display: flex;
-      align-items: flex-start;
-      gap: 20px;
+    h2 {
+      margin-bottom: 10px;
     }
-
-    .preview-box {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 300px;
-    }
-
-    .preview-container {
-      width: 300px;
-      height: 300px;
-      overflow: auto;
-      border: 1px solid #ccc;
-      background: #fff;
+    #layoutRow {
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
+      gap: 40px;
+      flex-wrap: wrap;
+      margin-top: 30px;
     }
-
-    #preview, #svgWrapper {
-      transform-origin: top left;
-    }
-
-    svg {
-      width: 100%;
-      height: 100%;
-    }
-
     .controls {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      width: 300px;
+      text-align: left;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      min-width: 300px;
+      max-width: 300px;
     }
-
+    .controls label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    .controls input[type="number"],
+    .controls select {
+      width: 100%;
+      padding: 5px;
+      box-sizing: border-box;
+    }
+    .previewBox {
+      width: 400px;
+      height: 400px;
+      border: 1px solid #ccc;
+      background: white;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #preview,
+    #svgPreview svg {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
     button {
-      margin-top: 5px;
-    }
-
-    .zoom-buttons {
-      display: flex;
-      gap: 5px;
-      margin-top: 5px;
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      width: 100%;
     }
   </style>
 </head>
 <body>
-  <h2>PNG to SVG Converter</h2>
+  <h2>Upload a PNG or use one of the vectorization modes</h2>
+  <input type="file" id="fileInput" /><br /><br />
 
-  <input type="file" id="fileInput"><br><br>
-
-  <div class="container">
+  <div id="layoutRow">
     <!-- PNG Preview -->
-    <div class="preview-box">
-      <strong>PNG Preview</strong>
-      <div class="preview-container">
-        <img id="preview" alt="Preview will appear here" />
-      </div>
-      <div class="zoom-buttons">
-        <button onclick="zoom('png', 1)">Zoom +</button>
-        <button onclick="zoom('png', -1)">Zoom -</button>
-      </div>
+    <div class="previewBox">
+      <img id="preview" alt="PNG Preview" />
     </div>
 
     <!-- Controls -->
     <div class="controls">
-      <label>Threshold: <span id="thresholdValue">180</span></label>
-      <input type="number" id="threshold" value="180" min="0" max="255">
+      <label>Threshold:</label>
+      <input type="number" id="threshold" min="0" max="255" value="180" />
 
-      <label>Turd Size: <span id="turdValue">2</span></label>
-      <input type="number" id="turdSize" value="2" min="0" max="50">
+      <label>Speck Removal (turdSize):</label>
+      <input type="number" id="turdSize" min="0" max="50" value="2" />
 
-      <label>Alphamax: <span id="alphaValue">1.0</span></label>
-      <input type="number" id="alphamax" value="1.0" min="0" max="1" step="0.1">
+      <label>Smoothness (alphamax):</label>
+      <input type="number" id="alphamax" min="0" max="1" step="0.05" value="1.0" />
 
-      <label>Stroke Width:</label>
-      <input type="number" id="strokeWidth" value="1" min="0" step="0.1">
-
-      <label>Stroke Color:</label>
-      <input type="color" id="strokeColor" value="#000000">
+      <label>Curve Tolerance (optTolerance):</label>
+      <input type="number" id="optTolerance" min="0.01" max="1.0" step="0.01" value="0.2" />
 
       <label>Presets:</label>
       <select id="presetSelect">
@@ -104,98 +98,96 @@
         <option value="detailed">Detailed</option>
       </select>
 
-      <label><input type="checkbox" id="outlineOnly"> Outline Outer Only</label>
+      <label><input type="checkbox" id="invert" /> Invert Colors</label>
+      <label><input type="checkbox" id="optCurve" checked /> Optimize Curves</label>
 
-      <div>
-        <button onclick="upload()">Convert</button>
-        <button id="undoBtn" onclick="undo()" disabled>Undo</button>
-        <button onclick="clearAll()">Clear</button>
-        <button id="downloadBtn" onclick="downloadSVG()" style="display:none;">Download SVG</button>
-      </div>
+      <label>Turn Policy:</label>
+      <select id="turnPolicy">
+        <option value="minority">Minority</option>
+        <option value="majority">Majority</option>
+        <option value="left">Left</option>
+        <option value="right">Right</option>
+        <option value="black">Black</option>
+        <option value="white">White</option>
+      </select>
+
+      <label>Vectorization Mode:</label>
+      <select id="vectorMode">
+        <option value="fill">Filled SVG</option>
+        <option value="outer">Outline Outer Contour</option>
+        <option value="all">Outline All Shapes</option>
+      </select>
+
+      <label>Zoom (SVG only):</label>
+      <input type="number" id="zoom" step="0.1" min="0.1" value="1.0" />
+
+      <button onclick="upload()">Convert</button>
+      <button id="downloadBtn" style="display:none" onclick="downloadSVG()">Download SVG</button>
     </div>
 
     <!-- SVG Preview -->
-    <div class="preview-box">
-      <strong>SVG Preview</strong>
-      <div class="preview-container">
-        <div id="svgWrapper">
-          <div id="svgPreview"></div>
-        </div>
-      </div>
-      <div class="zoom-buttons">
-        <button onclick="zoom('svg', 1)">Zoom +</button>
-        <button onclick="zoom('svg', -1)">Zoom -</button>
-      </div>
-    </div>
+    <div class="previewBox" id="svgPreview"></div>
   </div>
 
   <script>
-    const preview = document.getElementById("preview");
-    const svgPreview = document.getElementById("svgPreview");
-    const svgWrapper = document.getElementById("svgWrapper");
-
-    let pngZoom = 1;
-    let svgZoom = 1;
-    let historyStack = [];
+    const preview = document.getElementById('preview');
+    const svgPreview = document.getElementById('svgPreview');
+    const zoomInput = document.getElementById('zoom');
+    const downloadBtn = document.getElementById('downloadBtn');
     let currentSVG = '';
 
-    document.getElementById("fileInput").addEventListener("change", e => {
+    document.getElementById('presetSelect').addEventListener('change', (e) => {
+      const preset = e.target.value;
+      if (preset === 'minimal') {
+        threshold.value = 220;
+        turdSize.value = 10;
+        alphamax.value = 0.0;
+        optTolerance.value = 0.5;
+      } else if (preset === 'smooth') {
+        threshold.value = 150;
+        turdSize.value = 2;
+        alphamax.value = 1.0;
+        optTolerance.value = 0.2;
+      } else if (preset === 'detailed') {
+        threshold.value = 179;
+        turdSize.value = 1;
+        alphamax.value = 0.7;
+        optTolerance.value = 0.1;
+      }
+    });
+
+    document.getElementById('fileInput').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = () => preview.src = reader.result;
+        reader.onload = () => {
+          preview.src = reader.result;
+        };
         reader.readAsDataURL(file);
       }
     });
 
-    document.getElementById("presetSelect").addEventListener("change", e => {
-      const preset = e.target.value;
-      if (preset === "minimal") {
-        setInputs(220, 10, 0.0);
-      } else if (preset === "smooth") {
-        setInputs(150, 2, 1.0);
-      } else if (preset === "detailed") {
-        setInputs(179, 1, 0.7);
+    zoomInput.addEventListener('input', () => {
+      const svg = svgPreview.querySelector('svg');
+      if (svg) {
+        svg.style.transform = `scale(${parseFloat(zoomInput.value)})`;
       }
     });
 
-    function setInputs(threshold, turdSize, alpha) {
-      document.getElementById("threshold").value = threshold;
-      document.getElementById("turdSize").value = turdSize;
-      document.getElementById("alphamax").value = alpha;
-      updateLabels();
-    }
-
-    function updateLabels() {
-      document.getElementById("thresholdValue").textContent = document.getElementById("threshold").value;
-      document.getElementById("turdValue").textContent = document.getElementById("turdSize").value;
-      document.getElementById("alphaValue").textContent = document.getElementById("alphamax").value;
-    }
-
-    function zoom(target, dir) {
-      if (target === 'png') {
-        pngZoom += dir * 0.1;
-        pngZoom = Math.max(0.1, pngZoom);
-        preview.style.transform = `scale(${pngZoom})`;
-      } else {
-        svgZoom += dir * 0.1;
-        svgZoom = Math.max(0.1, svgZoom);
-        svgWrapper.style.transform = `scale(${svgZoom})`;
-      }
-    }
-
     async function upload() {
-      const file = document.getElementById("fileInput").files[0];
-      if (!file) return alert("Please upload a PNG file first.");
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) return alert("Select a PNG first!");
 
       const formData = new FormData();
       formData.append("image", file);
       formData.append("threshold", document.getElementById("threshold").value);
       formData.append("turdSize", document.getElementById("turdSize").value);
       formData.append("alphamax", document.getElementById("alphamax").value);
-      formData.append("strokeWidth", document.getElementById("strokeWidth").value);
-      formData.append("strokeColor", document.getElementById("strokeColor").value);
-      formData.append("outlineOnly", document.getElementById("outlineOnly").checked);
+      formData.append("optTolerance", document.getElementById("optTolerance").value);
+      formData.append("invert", document.getElementById("invert").checked);
+      formData.append("optCurve", document.getElementById("optCurve").checked);
+      formData.append("turnPolicy", document.getElementById("turnPolicy").value);
+      formData.append("vectorMode", document.getElementById("vectorMode").value);
 
       const res = await fetch("/api/vectorize", {
         method: "POST",
@@ -203,38 +195,18 @@
       });
 
       const svg = await res.text();
-      if (currentSVG) historyStack.push(currentSVG);
-      currentSVG = svg;
       svgPreview.innerHTML = svg;
-      svgWrapper.style.transform = `scale(${svgZoom})`;
-      document.getElementById("undoBtn").disabled = historyStack.length === 0;
-      document.getElementById("downloadBtn").style.display = "inline-block";
-    }
-
-    function undo() {
-      if (historyStack.length > 0) {
-        currentSVG = historyStack.pop();
-        svgPreview.innerHTML = currentSVG;
-        svgWrapper.style.transform = `scale(${svgZoom})`;
-        document.getElementById("undoBtn").disabled = historyStack.length === 0;
-      }
-    }
-
-    function clearAll() {
-      preview.src = "";
-      svgPreview.innerHTML = "";
-      historyStack = [];
-      currentSVG = '';
-      document.getElementById("undoBtn").disabled = true;
-      document.getElementById("downloadBtn").style.display = "none";
+      currentSVG = svg;
+      downloadBtn.style.display = 'inline-block';
+      zoomInput.dispatchEvent(new Event("input"));
     }
 
     function downloadSVG() {
       const blob = new Blob([currentSVG], { type: "image/svg+xml" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
-      a.download = "converted-image.svg";
+      a.download = 'converted-image.svg';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
