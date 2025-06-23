@@ -26,7 +26,7 @@ app.post('/api/vectorize', upload.single('image'), (req, res) => {
     color: 'black',
   };
 
-  const traceFn = 
+  const traceFn =
     vectorMode === 'outer'
       ? potrace.trace
       : vectorMode === 'all'
